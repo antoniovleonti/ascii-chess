@@ -540,7 +540,7 @@ int** K__(int** B, int* pos, Player player)
             }
         }
     }
-    malloc_from_tmp(tmp, count);
+    return malloc_from_tmp(tmp, count);
 }
 
 // UTILITY FUNCTIONS
