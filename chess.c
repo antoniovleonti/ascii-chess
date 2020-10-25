@@ -82,7 +82,17 @@ int main(void)
         {-1,-1,-1,-1,-1,-1,-1,-1},
         {-4,-2,-3,-6,-5,-3,-2,-4}
     };
-    printf("\nChess by Antonio Leonti (Oct 25, 2020)\n\nNotes:\n - Enter your moves as \"e2e4\", \"e7e5\", etc.\n - This program follows all the normal rules\n   of chess.\n - White's (player 1's) pieces are capital\n   letters, while those of Black (player -1)\n   are lowercase.\n");
+    printf
+    (   "\n%s%s%s%s%s\n",
+
+        "Chess by Antonio Leonti (Oct 25, 2020)\n\n",
+
+        "Notes:\n",
+        " - Enter your moves as \"e2e4\", \"e7e5\", etc.\n",
+        " - This program follows all the normal rules of chess (EXCEPT for underpromotion).\n",
+        " - White's pieces are capital letters, while those of Black are lowercase.\n"
+        " - The board is flipped every move to face the player to move.\n"
+    );
 
     // play the game
     result = play_game(B, canCastle);
@@ -673,8 +683,8 @@ void print_board(int** B, Player player)
         }
     }
     // bottom border
-    printf("\n\n\t     ");
-    for(int j=0;j<8*3-1;j++) printf("-");
+    printf("\n\n\t      ");
+    for(int j=0;j<7*3+1;j++) printf("-");
     // label abc
     printf("\n\n\t    ");
     for(int i=7*(p<0);i<8&&i>=0;i+=p) printf(" %2c", "hgfedcba"[i]);
