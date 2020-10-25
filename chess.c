@@ -12,14 +12,12 @@
 #define QUEEN   5
 #define KING    6
 
-
 typedef struct Player_
 {
     int id; // = {-1, 1}
     int canCastle; // {-1, 0, 1, 2}->(Qside only, no, Kside only, both)
 } Player;
 typedef int** (*Piece_f)(int**, int*, Player);
-
 
 int play_game(int[8][8], int[2]);
 int** make_move(int**, int**, Player*);
@@ -58,28 +56,28 @@ int main(void)
 
     int B[8][8] =
     // test starting position
-    {
-        { 0, 0, 0, 0, 0, 0, 0, 0},
-        { 0, 0, 0, 0, 0, 0, 0, 0},
-        { 0, 0, 0, 0, 0, 0, 0, 0},
-        { 0, 0, 0, 0, 0, 0, 0, 0},
-        { 0, 0, 0, 0, 0, 0, 0, 0},
-        { 0, 6, 0, 0, 0, 0, 0, 0},
-        { 0, 0, 0, 0, 0, 0, 1, 0},
-        { 0,-6, 0, 0, 0, 0, 0, 0}
-    };
+    // {
+    //     { 0, 0, 0, 0, 0, 0, 0, 0},
+    //     { 0, 0, 0, 0, 0, 0, 0, 0},
+    //     { 0, 0, 0, 0, 0, 0, 0, 0},
+    //     { 0, 0, 0, 0, 0, 0, 0, 0},
+    //     { 0, 0, 0, 0, 0, 0, 0, 0},
+    //     { 0, 6, 0, 0, 0, 0, 0, 0},
+    //     { 0, 0, 0, 0, 0, 0, 1, 0},
+    //     { 0,-6, 0, 0, 0, 0, 0, 0}
+    // };
     // 1=P, 2=N, 3=B, 4=R, 5=Q, 6=K
     // "classic" starting position
-    // {
-    //     { 4, 2, 3, 6, 5, 3, 2, 4},
-    //     { 1, 1, 1, 1, 1, 1, 1, 1},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     {-1,-1,-1,-1,-1,-1,-1,-1},
-    //     {-4,-2,-3,-6,-5,-3,-2,-4}
-    // };
+    {
+        { 4, 2, 3, 6, 5, 3, 2, 4},
+        { 1, 1, 1, 1, 1, 1, 1, 1},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        {-1,-1,-1,-1,-1,-1,-1,-1},
+        {-4,-2,-3,-6,-5,-3,-2,-4}
+    };
 
     // play the game
     result = play_game(B, canCastle);
@@ -138,6 +136,12 @@ int play_game(int start[8][8], int canCastle[2])
             // get move ("g1f3 instead of Nf3" - PGN is HARD to program)
             fgets(input, 100, stdin);
             int** m = read_move(input); // translate input; move is in m
+
+            if(!m) // if input is invalid
+            {
+                puts("\n (?) Invalid input! Try again.\n");
+                i=!i; continue;
+            }
 
             if(is_legal(B, m, player[i]))
             {
@@ -603,10 +607,10 @@ int** read_move(char* str)
     for(int i=0; i<4; i++)
     {
         if((c = strchr(abcs, str[i]))) // if youre using abc notation...
-        r[i/2][1-i%2] = (int)(c-abcs);
+            r[i/2][1-i%2] = (int)(c-abcs);
 
         else if((c = strchr(nums, str[i]))) // number notation...
-        r[i/2][1-i%2] = (int)(c-nums);
+            r[i/2][1-i%2] = (int)(c-nums);
 
         else return NULL;
     }
@@ -649,21 +653,21 @@ void print_board(int** B, Player player)
     char out[5];
     for(int i=0; i<8; i++)
     {
-        printf("\n\t%d |",i+1); // label 123
+        printf("\n\t%d |  ",i+1); // label 123
         for(int j=0; j<8; j++)
         {
             int v = B[i][j];
             sprintf(out,"%d",v);
             printf( "%2s ",
                     abs(v)==EP_FLAG || !v
-                        ? i%2 == j%2 ? "~" : ":"    // empty squares
+                        ? i%2 == j%2 ? ":" : "~"    // empty squares
                         : out                       // pieces
             );
         }
     }
-    printf("\n\n\t    ");
+    printf("\n\n\t     ");
     for(int j=0; j<8*3-1; j++) printf("-"); // bottom border
-    printf("\n\n\t  ");
+    printf("\n\n\t    ");
     for(int j=0; j<8; j++) printf(" %2c", "hgfedcba"[j]); // label abc
     printf("\n\n");
 }
