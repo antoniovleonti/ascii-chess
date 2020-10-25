@@ -1,3 +1,7 @@
+/*  Antonio Leonti
+    10.25.2020
+    ASCII Chess
+*/
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -384,19 +388,22 @@ int can_move(int** B, Player player)
 /*
 PIECE MOVEMENT FUNCTIONS
 
-Each generates a list of all squares a piece at position 'pos' can reach given board state 'B' (REGARDLESS of whether there is actually that piece at pos). This list is EQUIVALENT to the list of all squares from which the same piece (of the opposite color) could reach position p:
+Each generates a list of all squares a piece at position 'pos' can reach given
+board state 'B' (REGARDLESS of whether there is actually that piece at pos).
+This list is EQUIVALENT to the list of all squares from which the same piece
+(of the opposite color) could reach position p:
 
 "To where could a white bishop on e4 move?"
     ...is equivalent to...
 "From where could a black bishop move _to_ e4?"
 
-This equivalence is very useful as it allows calculating potential checks, legal moves, etc for each piece using just one function.
+This equivalence is very useful as it allows calculating potential checks,
+legal moves, etc for each piece using just one function.
 
-return structure = {n, {y_1, x_1, isCapture_1},...,{y_n, x_n, isCapture_n}}
+return looks like {n, {y_1, x_1, isCapture_1},...,{y_n, x_n, isCapture_n}}
 */
 int** P__(int** B, int* pos, Player player)
 {
-
     // an unmoved pawn w/ no obstructions & two pieces to take has 4 moves
     int tmp[100][3];
     int y, x, count = 0;
@@ -441,8 +448,8 @@ int** P__(int** B, int* pos, Player player)
 
 int** N__(int** B, int* pos, Player player)
 {
-    int tmp[100][3] = // initialize to all possible {dx, dy} pairs
-    {               // will later hold final coordinates
+    int tmp[100][3] =   // initialize to all possible {dx, dy} pairs
+    {                   // will later hold final coordinates
         {-2,-1, 0}, {-2, 1, 0}, { 2,-1, 0}, { 2, 1, 0},
         {-1,-2, 0}, {-1, 2, 0}, { 1,-2, 0}, { 1, 2, 0}
     };
@@ -469,7 +476,6 @@ int** B__(int** B, int* pos, Player player)
     // a bishop on an open board can reach 13 squares from the center
     int tmp[100][3];
     int dy, dx, count = 0;
-
 
     for(int a=0; a<2; a++)
     for(int b=0; b<2; b++)
