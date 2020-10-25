@@ -441,9 +441,9 @@ int** R__(int** B, int* pos, Player player)
     for(int a=0; a<2; a++)
     for(int b=0; b<2; b++)
     {
-        dy =  a*1-2*a;
-        dx = !a*1-2*b;
-        //printf("dy = %d dx = %d\n", dy, dx);
+        dy =  a*(1-2*b);
+        dx = !a*(1-2*b);
+        //printf("R__: dy=%2d dx=%2d\n", dy, dx);
         count = trace_dydx(B, tmp, pos, dy, dx, player, count);
     }
     return malloc_from_tmp__(tmp, count);
@@ -615,7 +615,7 @@ void print_board(int** B, Player player)
             sprintf(out,"%d",v);
             printf( " %2s",
                     abs(v)==EP_FLAG || !v
-                        ? i%2 == j%2 ? "~" : "+"    // empty squares
+                        ? i%2 == j%2 ? "-" : ":"    // empty squares
                         : out                       // pieces
             );
         }
