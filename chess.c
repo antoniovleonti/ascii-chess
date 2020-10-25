@@ -13,12 +13,12 @@
 #define KING    6
 
 
-typedef int** (*Piece_f)(int**, int*, Player);
 typedef struct Player_
 {
     int id; // = {-1, 1}
     int canCastle; // {-1, 0, 1, 2}->(Qside only, no, Kside only, both)
 } Player;
+typedef int** (*Piece_f)(int**, int*, Player);
 
 
 int play_game(int[8][8], int[2]);
@@ -108,7 +108,7 @@ int play_game(int start[8][8], int canCastle[2])
     }
 
     // create players
-    
+
     Player player[2];
     for(int i=0; i<2; i++)
     {
@@ -668,7 +668,7 @@ void print_board(int** B, Player player)
     printf("\n\n");
 }
 
-v
+void free_board(int** B)
 {
     for(int i=0; i<8; i++)
         free(B[i]);
