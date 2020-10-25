@@ -86,8 +86,8 @@ int main(void)
 
     // print results
     for(int i=0; i<=35; i++) putchar('*');
-    if(result) printf("\nCHECKMATE! Player %d wins!\n", result);
-    else printf("\nSTALEMATE! It's a draw!\n");
+    if(result) printf("\nCHECKMATE! Player %d wins!\n\n", result);
+    else printf("\nSTALEMATE! It's a draw!\n\n");
 
     return 0;
 }
@@ -602,10 +602,10 @@ int** read_move(char* str)
     char* c;
     for(int i=0; i<4; i++)
     {
-        if(c = strchr(abcs, str[i])) // if youre using abc notation...
+        if((c = strchr(abcs, str[i]))) // if youre using abc notation...
         r[i/2][1-i%2] = (int)(c-abcs);
 
-        else if(c = strchr(nums, str[i])) // number notation...
+        else if((c = strchr(nums, str[i]))) // number notation...
         r[i/2][1-i%2] = (int)(c-nums);
 
         else return NULL;
