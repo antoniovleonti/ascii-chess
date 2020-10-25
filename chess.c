@@ -78,6 +78,7 @@ int main(void)
         {-1,-1,-1,-1,-1,-1,-1,-1},
         {-4,-2,-3,-6,-5,-3,-2,-4}
     };
+    printf("\nChess by Antonio Leonti (Oct 25, 2020)\n\nNotes:\n - Enter your moves as \"e2e4\", \"e7e5\", etc.\n - This program follows all the normal rules\n   of chess.\n - White's (player 1's) pieces are capital\n   letters, while those of Black (player -1)\n   are lowercase.\n");
 
     // play the game
     result = play_game(B, canCastle);
@@ -132,7 +133,7 @@ int play_game(int start[8][8], int canCastle[2])
         else
         {
             // otherwise, the game goes on.
-            printf("\nPlayer %d's turn:\n\t> ",player[i].id);
+            printf("\n%s's turn:\n\t> ",player[i].id>0?"White":"Black");
             // get move ("g1f3 instead of Nf3" - PGN is HARD to program)
             fgets(input, 100, stdin);
             int** m = read_move(input); // translate input; move is in m
@@ -651,24 +652,26 @@ int* find(int** B, int piece, Player player)
 void print_board(int** B, Player player)
 {
     char out[5];
-    for(int i=0; i<8; i++)
+    int v, p = -player.id;
+    for(int i=7*(p<0); i<8 && i>=0; i+=p)
     {
-        printf("\n\t%d |  ",i+1); // label 123
-        for(int j=0; j<8; j++)
+        printf("\n\t%d |  ", i+1); // label 123
+        for(int j=7*(p<0); j<8 && j>=0; j+=p)
         {
             int v = B[i][j];
-            sprintf(out,"%d",v);
-            printf( "%2s ",
+            printf( "%2c ",
                     abs(v)==EP_FLAG || !v
-                        ? i%2 == j%2 ? ":" : "~"    // empty squares
-                        : out                       // pieces
+                        ? i%2 == j%2 ? ':' : '~'    // empty squares
+                        : "kqrbnp_PNBRQK"[6+v]      // pieces
             );
         }
     }
+    // bottom border
     printf("\n\n\t     ");
-    for(int j=0; j<8*3-1; j++) printf("-"); // bottom border
+    for(int j=0;j<8*3-1;j++) printf("-");
+    // label abc
     printf("\n\n\t    ");
-    for(int j=0; j<8; j++) printf(" %2c", "hgfedcba"[j]); // label abc
+    for(int i=7*(p<0);i<8&&i>=0;i+=p) printf(" %2c", "hgfedcba"[i]);
     printf("\n\n");
 }
 
