@@ -7,71 +7,59 @@
 #include <stdlib.h>
 #include <math.h>
 
-#define N_pcs   6 // number of pieces
-#define EP_FLAG 99
-#define PAWN    1 // piece ids
+#define N_PCS   6   // number of pieces
+#define PAWN    1   // piece ids
 #define KNIGHT  2
 #define BISHOP  3
 #define ROOK    4
 #define QUEEN   5
 #define KING    6
+#define EP_FLAG 99  // en passant flag
 
-typedef struct Player_
+typedef struct Board_
 {
-    int id; // = {-1, 1}
-    int canCastle; // {-1, 0, 1, 2}->(Qside only, no, Kside only, both)
-} Player;
-typedef int** (*Piece_f)(int**, int*, Player);
+    int** b; // 8x8
+    int** t;// 8x8
+} Board;
 
-int play_game(int[8][8], int[2]);
-int** make_move(int**, int**, Player*);
-int is_legal(int**, int**, Player);
-int is_hit(int**, int*, Player);
-int can_move(int**, Player);
+typedef int*** (*Piece_f)(Board, int*, int);
+
+int play_game(Board);
+int is_legal(Board, int**, int);
+int is_hit(Board, int*, int);
+int can_move(Board, int);
+Board make_move(Board, int**, int);
 
 // piece-specific functions
-int** P__(int**, int*, Player);
-int** N__(int**, int*, Player);
-int** B__(int**, int*, Player);
-int** R__(int**, int*, Player);
-int** K__(int**, int*, Player);
-int** Q__(int**, int*, Player);
+int*** P__(Board, int*, int);
+int*** N__(Board, int*, int);
+int*** B__(Board, int*, int);
+int*** R__(Board, int*, int);
+int*** K__(Board, int*, int);
+int*** Q__(Board, int*, int);
 // QOL fns for the above fns^^
-int** malloc_from_tmp(int[][3], int);
-void trace_dydx(int**, int[][3], int*, int, int, Player, int*);
+void trace_dydx(Board, int[][64][2], int*, int, int, int, int[2]);
+int*** malloc_from_tmp(int[][64][2], int[2]);
 
 // utility functions
-int* find(int**, int, Player);
+int* find(Board, int, int);
 int signum(int);
 // handling boards
-int** cpy_board(int**);
-void free_board(int**);
+Board cpy_board(Board);
+void free_board(Board);
 // IO
-void print_board(int**, Player);
+void print_board(Board, int);
 int** read_move(char*); // input -> move
 
 // array of piece-specific functions
-Piece_f list_moves[N_pcs] = {P__,N__,B__,R__,Q__,K__};
+Piece_f list_moves[N_PCS] = {P__,N__,B__,R__,Q__,K__};
 
 int main(void)
 {
-    int result;
-    int canCastle[2] = {2,2};
+    int r;
+    Board B;
 
-    int B[8][8] =
-    // test starting position
-    // {
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 0, 0},
-    //     { 0, 6, 0, 0, 0, 0, 0, 0},
-    //     { 0, 0, 0, 0, 0, 0, 1, 0},
-    //     { 0,-6, 0, 0, 0, 0, 0, 0}
-    // };
-    // 1=P, 2=N, 3=B, 4=R, 5=Q, 6=K
-    // "classic" starting position
+    int start[8][8] =
     {
         { 4, 2, 3, 6, 5, 3, 2, 4},
         { 1, 1, 1, 1, 1, 1, 1, 1},
@@ -82,6 +70,18 @@ int main(void)
         {-1,-1,-1,-1,-1,-1,-1,-1},
         {-4,-2,-3,-6,-5,-3,-2,-4}
     };
+
+    B.b = malloc(8*sizeof(int*));
+    B.t = malloc(8*sizeof(int*));
+
+    for(int i=0; i<8; i++)
+    {
+        B.b[i] = malloc(8*sizeof(int));
+        B.t[i] = calloc(8,sizeof(int));
+
+        for(int j=0; j<8; j++) B.b[i][j] = start[i][j];
+    }
+
     printf
     (   "\n%s%s%s%s%s\n",
 
@@ -95,11 +95,11 @@ int main(void)
     );
 
     // play the game
-    result = play_game(B, canCastle);
+    r = play_game(B);
 
     // print results
     for(int i=0; i<=35; i++) putchar('*');
-    if(result) printf("\nCHECKMATE! Player %d wins!\n\n", result);
+    if(r) printf("\nCHECKMATE! %s wins!\n\n", r>0?"White":"Black");
     else printf("\nSTALEMATE! It's a draw!\n\n");
 
     return 0;
@@ -108,46 +108,31 @@ int main(void)
 // core functions
 
 // play a game and return the winner, or 0 if a draw.
-int play_game(int start[8][8], int canCastle[2])
+int play_game(Board B)
 {
     char input[100]; // input buffer
 
-    // copy board position
-    int** B = malloc(sizeof(int*)*8);
-    for(int i=0; i<8; i++)
-    {
-        B[i] = malloc(sizeof(int)*8); // make space
-        for(int j=0; j<8; j++) B[i][j] = start[i][j]; // populate
-    }
-
-    // create players
-
-    Player player[2];
-    for(int i=0; i<2; i++)
-    {
-        player[i].id = 1-2*i;
-        player[i].canCastle = canCastle[i];
-    }
-
     // begin game
-    for(int i=0; 1; i=!i)
+    for(int i=1; 1; i=-i)
     {
-        print_board(B, player[i]);
+        print_board(B, i);
 
         // check for mate at the start of every move.
-        if(!can_move(B, player[i])) // if player has no valid moves
+        if(!can_move(B, i)) // if player has no valid moves
         {
-            int* pos = find(B, KING, player[i]); // find the king
-
-            int isCheck = is_hit(B, pos, player[i]); // is he in check?
+            // find the king
+            int* pos = find(B, KING, i);
+            // is he in check?
+            int isCheck = is_hit(B, pos, i);
             free(pos); // (done with this)
 
-            return isCheck * -player[i].id; // return {-1, 0, 1}
+            return isCheck * -i; // return {-1, 0, 1}
         }
         else
         {
             // otherwise, the game goes on.
-            printf("\n%s's turn:\n\t> ",player[i].id>0?"White":"Black");
+            printf("\n%s's turn:\n\t> ", (i>0) ? "White" : "Black");
+
             // get move ("g1f3 instead of Nf3" - PGN is HARD to program)
             fgets(input, 100, stdin);
             int** m = read_move(input); // translate input; move is in m
@@ -155,23 +140,25 @@ int play_game(int start[8][8], int canCastle[2])
             if(!m) // if input is invalid
             {
                 puts("\n (?) Invalid input! Try again.\n");
-                i=!i; continue;
+                i =- i;
+                continue;
             }
 
-            if(is_legal(B, m, player[i]))
+            if(is_legal(B, m, i))
             {
-                B = make_move(B, m, &player[i]);
+                B = make_move(B, m, i);
                 //remove opponent's en passant flag if it exists
-                int* pos = find(B, EP_FLAG, player[!i]);
+                int* pos = find(B, EP_FLAG, -i);
                 if(pos)
                 {
-                    B[pos[0]][pos[1]] = 0;
+                    B.b[pos[0]][pos[1]] = 0;
                     free(pos);
                 }
-            } else
+            }
+            else
             {
                 printf("\n (!) Illegal move! Try again.\n");
-                i=!i;
+                i=-i;
             }
             free(m);
         }
@@ -179,14 +166,15 @@ int play_game(int start[8][8], int canCastle[2])
 }
 
 // plays a move on the board & handles special moves
-int** make_move(int** B, int** m, Player* player)
+Board make_move(Board B, int** move, int player)
 {
     // helpful shortcuts
-    int y0 = m[0][0],   y1 = m[1][0];
-    int x0 = m[0][1],   x1 = m[1][1];
-    int dy = y1 - y0,   dx = x1 - x0;
-    int piece = B[y0][x0];
-    //printf("piece = %d\n", piece);
+    int y[2] = {move[0][0],move[1][0]};
+    int x[2] = {move[0][1],move[1][1]};
+    int dy = y[1]-y[0], dx = x[1]-x[0];
+
+    int piece = B.b[y[1]][x[0]];
+
     // special cases go here. (en passant, castling)
     switch(abs(piece))
     {
@@ -195,203 +183,237 @@ int** make_move(int** B, int** m, Player* player)
             if(!dy && abs(dx)==2)
             {
                 // take care of the rook
-                B[y0][(int)(4+(3.5f*signum(dx)))] = 0;
-                B[y0][x0+signum(dx)] = ROOK*player->id;
-
-                player->canCastle = 0;
+                B.b[y[0]][(int)(4+(3.5f*signum(dx)))] = 0;
+                B.b[y[0]][x[0]+signum(dx)] = ROOK*player;
             }
-        } break;
-        case ROOK: // more castling
-        {
-            player->canCastle = !!(player->canCastle) * -signum(x0-4);
         } break;
         case PAWN:
         {
             // enable en passant
-            if(!dx && dy==2*player->id)
-                B[y0+player->id][x0] = player->id*EP_FLAG;
+            if(!dx && dy==2*player)
+                B.b[y[0]+player][x[0]] = player*EP_FLAG;
 
             // enable pawn promotions
-            else if(y1==(int)(4+(3.5*player->id)))
-                B[y0][x0] = QUEEN*player->id;
+            else if(y[1]==(int)(4+(3.5*player)))
+                B.b[y[0]][x[0]] = QUEEN*player;
         } break;
     }
-    // perform desired move
-    B[y1][x1] = B[y0][x0];
-    B[y0][x0] = 0;
 
+    // perform desired move
+    B.b[y[1]][x[1]] = B.b[y[0]][x[0]];
+    B.b[y[0]][x[0]] = 0;
+
+    // remember these squares were touched
+    B.t[y[0]][x[0]] = B.t[y[1]][x[1]] = 0;
+
+    // return new board state (useful for when making a move from cpy_board)
     return B;
 }
 
 // checks validity of a move (Da Rules)
-int is_legal(int** B, int** move, Player player)
+int is_legal(Board B, int** move, int player)
 {
+    int y[2] = {move[0][0], move[1][0]};
+    int x[2] = {move[0][1], move[1][1]};
+    int dy = y[1]-y[0];
+    int dx = x[1]-x[0];
 
-    // helpful shortcuts
-    int y0  = move[0][0], y1 = move[1][0];
-    int x0  = move[0][1], x1 = move[1][1];
-    int dy  = y1 - y0,    dx = x1 - x0;
-    int piece = B[y0][x0];
+    int p[2] = {B.b[y[0]][x[0]], B.b[y[1]][x[1]]};
 
-    int isClear = 0;
-    int isCheck = 1;
+    int*** list;
+    int* pos;
 
-    // a player can only move their pieces
-    if(signum(piece) != player.id) return 0;
+    int ischeck;
+    int islegal;
 
-    // castling logic
-    if(abs(piece)==KING && abs(dx)==2 && !dy)
+    // check for special cases
+    switch(abs(p[0]))
     {
-        // does the player have castling privileges?
-        if(player.canCastle==2 || player.canCastle==dx/2)
+        case KING:
         {
-            // check if squares are empty
-            for(int i=y0; i>=1 && i<7; i+=dx/2)
-                if(B[y0][i]) return 0;
-
-            // check if king is in / moves through check
-            int* pos_K = malloc(sizeof(int)*2);
-            for(int i=0; i<=2; i++)
+            // the move is to castle
+            if( // moving correctly
+                dx==2 && !dy &&
+                // is on the right square
+                *y==4+(3.5*player) && *x==3 &&
+                // has not touched king or rook yet
+                !(B.t[*y][*x] || B.t[*y][dx>0?7:0])
+            )
             {
-                pos_K[0] = y0;
-                pos_K[1] = x0 + i*(dx/2);
-                // see if this square is attacked
-                if(is_hit(B, pos_K, player))
+                for(int i=3; i>0 && i<6; i+=dx/2)
+                    // make sure other's no piece there
+                    if(B.b[*y][3+i]) return 0;
+
+                pos = malloc(2*sizeof(int));
+
+                for(int i=3; i>1 && i<7; i+=dx/2)
                 {
-                    free(pos_K);
-                    return 0;
+                    pos[0] = *y;
+                    pos[1] = 3+i;
+                    // make sure you're not in check
+                    if(is_hit(B, pos, player))
+                    {
+                        free(pos);
+                        return 0;
+                    }
+                    free(pos);
                 }
+                return 1;
             }
-            // if the above tests are passed, the player may castle.
-            return 1;
-        }
+        } break;
     }
-    // normal move logic
-    else
+    // for normal moves
+
+    // see if the move is pseudo-legal
+    list = list_moves[abs(p[0])-1](B, move[0], player);
+
+    // only check captures or non-captures-- whichever is needed
+    if(list[!p[1]])
     {
-        // 1. IS THE SQUARE AVAILABLE FOR THIS PIECE?
-        // generate list of available squares
-        int** sqrs = list_moves[abs(piece)-1](B, move[0], player);
-
-        // if there are no valid moves w this piece, you're done
-        if(!sqrs) return 0;
-
-        // iterate through list
-        for(int i=1; i<=**sqrs; i++)
-        {
-            // if selected element square is desired square,
-            if(y1==sqrs[i][0] && x1==sqrs[i][1])
-            {
-                // free remaining sqrs
-                for(; i<=**sqrs; i++) free(sqrs[i]);
-
-                isClear = 1;
-                break;
-            }
-            // otherwise, free this element
-            free(sqrs[i]);
-        }
-        // if that square wasn't in the list, it can't be a legal move
-        if(!isClear) return 0;
-
-        // 2. DOES THIS MOVE RESULT IN CHECK FOR THE PLAYER WHO PLAYED IT?
-        // copy the board and make the move on this copy.
-        int** H = make_move(cpy_board(B), move, &player);
-
-        // locate the king.
-        int* pos_K = find(H, KING, player);
-
-        // (if you found the king,) see if he is in check.
-        if(pos_K) isCheck = is_hit(H, pos_K, player);
-
-        // free the copied board and the king's position
-        free(pos_K); free_board(H);
-
-        return !isCheck;
+        // delete elements
+        for(int i=**list[!p[1]]; i>=0; i--) free(list[!p[1]][i]);
+        free(list[!p[1]]); // delete pointer
     }
-    return 0;
+
+    if(!list[!!p[1]]) return 0;
+
+    for(int i=1; i<=**list[!!p[1]]; i++)
+    {
+        //grab this pointer
+        pos = list[!!p[1]][i];
+
+        // printf("%d: (%d/%d) %d %d\n", p[0], i, **list[!!p[1]], pos[0], pos[1]);
+
+        if( pos[0] == move[1][0]
+        &&  pos[1] == move[1][1] )
+        {
+            // free everything
+            // puts("HERE!1");
+            for(;i<=**list[!!p[1]]; i++)
+            {
+                free(list[!!p[1]][i]);
+            }
+
+            islegal = 1;
+            break;
+        }
+        free(pos);
+    }
+    free(list[!!p[1]]);
+    free(list);
+
+    if(!islegal) return 0;
+
+    // now see if it's check. Make the move on another board.
+    Board H = make_move(cpy_board(B), move, player);
+    // find the king
+    pos = find(H, KING, player);
+    // see if he's in check
+    ischeck = is_hit(H, pos, player);
+    // free stuff
+    free(pos);
+    free_board(H);
+
+    return !ischeck;
 }
 
-// checks for check (or potential check) of player
-int is_hit(int** B, int* pos, Player player)
+//-checks for check (or potential check) of player-----------------------------
+int is_hit(Board B, int* pos, int player)
 {
-    int x, y;
-    int** sqrs;
+    // for list_moves[]();
+    int*** list;
+    int y, x;
 
-    // check all potential attacker squares (max = 36)
-    for(int i=0; i<N_pcs; i++)
+    for(int i=0; i<N_PCS; i++)
     {
-        // list of squares where this piece could be used to attack (pos)
-        int** sqrs = list_moves[i](B, pos, player);
+        // get all moves possible from piece from pos
+        list = list_moves[i](B, pos, player);
 
-        // if there are no squares, go to next piece type
-        if(!sqrs) continue;
-
-        // iterate through squares
-        for(int j=1; j<=**sqrs; j++)
+        // we don't need to check the non-captures
+        if(list[0])
         {
-            y = sqrs[j][0], x = sqrs[j][1];
+            for(int j=**list[0]; j>=0; j--) free(list[0][j]); // elements
+            free(list[0]); // delete pointer
+        }
 
-            if( B[y][x]==(i+1)*(-player.id)  // is it the right piece type?
-                && sqrs[j][2]              ) // is this a capture?
+        // check all potential captures here
+        if(!list[1]) return 0;
+
+        for(int j=1; j<=**list[1]; j++)
+        {
+            y = list[1][j][0];
+            x = list[1][j][1];
+
+            // if this is the right type of piece
+            if(abs(B.b[y][x]) == i+1)
             {
-                for(; j<=**sqrs; j++) free(sqrs[j]);
-                free(sqrs); // first free this
+                // free everything
+                for(;j<**list[1]; j++) free(list[1][j]);
+                free(list[1][0]); free(list[1]);
 
                 return 1;
             }
-            free(sqrs[j]);
+            free(list[1][j]);
         }
-        free(sqrs);
+        free(list[1]);
+        free(list);
     }
     return 0;
 }
 
-// checks for stalemate / checkmate
-int can_move(int** B, Player player)
+//-checks for stalemate / checkmate--------------------------------------------
+int can_move(Board B, int player)
 {
-    //printf("can_move(player %d)\n",player.id);
+    // for list_moves[]();
+    int*** list;
+    // for feeding moves into is_legal
+    int** move = malloc(2*sizeof(int*));
+    move[0]    = malloc(2*sizeof(int));
+
     int piece;
-    int** sqrs; // will store list of valid moves
+    int* i = &move[0][0];
+    int* j = &move[0][1];
 
-    int** move = malloc(sizeof(int*)*2); // for list_moves and is_legal
-    move[0] = malloc(sizeof(int)*2); // second position comes from sqrs[]
-
-    for(int i=0; i<8; i++) // go through entire board
-    for(int j=0; j<8; j++)
+    // iterate through entire board
+    for(*i=0; *i<8; (*i)++)
+    for(*j=0; *j<8; (*j)++)
     {
-        piece = B[i][j];
-
-        if(signum(piece) == player.id) // if piece belongs to player
+        piece = B.b[*i][*j];
+        //
+        if(signum(piece)==player)
         {
-            // friendly piece was found at (i,j) moves from (i,j)
-            move[0][0] = i, move[0][1] = j;
-            // list of candidate moves from (i,j)
-            sqrs = list_moves[abs(piece)-1](B,move[0],player);
+            // get the list of possible moves
+            list = list_moves[abs(piece)-1](B, move[0], player);
 
-            // if there are no candidate moves, onto the next square.
-            if(!sqrs) continue;
-
-            // otherwise search for valid move in candidate moves.
-            for(int k=1; k<=**sqrs; k++)
+            // iterate through possible moves
+            for(int k=0; k<2; k++)
             {
-                // get destination from sqrs
-                move[1] = sqrs[k];
-                if(is_legal(B, move, player)) // if the move is legal
-                {
-                    for(;k<=**sqrs;k++) free(sqrs[k]); // free candidate moves
-                    free(sqrs); // pointer to candidate moves
-                    free(move[0]); free(move);
+                if(!list[k]) continue;
 
-                    return 1;
+                for(int l=1; l<=**list[k]; l++)
+                {
+                    // copy move destination
+                    move[1] = list[k][l];
+                    // if you find a legal move,
+                    if(is_legal(B, move, player))
+                    {
+                        // free everything
+                        for(;k<2; k++)
+                        {
+                            if(list[k])
+                            {
+                                for(;l<=**list[k]; l++) free(list[k][l]);
+                            }
+                            free(list[k]);
+                        }
+                        return 1;
+                    }
+                    free(list[k][l]);
                 }
-                free(sqrs[k]); // free illegal moves as you go
+                free(list[k]);
             }
         }
     }
-    free(move[0]); free(move);
-    free(sqrs);
-
     return 0;
 }
 
@@ -412,133 +434,138 @@ legal moves, etc for each piece using just one function.
 
 return looks like {n, {y_1, x_1, isCapture_1},...,{y_n, x_n, isCapture_n}}
 */
-int** P__(int** B, int* pos, Player player)
+int*** P__(Board B, int* pos, int player)
 {
-    // an unmoved pawn w/ no obstructions & two pieces to take has 4 moves
-    int tmp[100][3];
-    int y, x, count = 0;
+    int tmp[2][64][2] = {0};
+    int count[2] = {0};
+    int y, x, dx;
 
-    // if nothing's directly in front of the pawn
-    y = pos[0]+player.id;
+    // first non-captures
+    y = pos[0] + player;
     x = pos[1];
-    if(!B[y][x])
+    // if nothing's directly in front of the pawn
+    if(!B.b[y][x])
     {
         // it can move forward 1
-        tmp[count][0] = y;
-        tmp[count][1] = x;
-        tmp[count][2] = 0; // is never a capture
-        count++;
+        tmp[0][count[0]][0] = y;
+        tmp[0][count[0]][1] = x;
+        count[0]++;
 
-        y = pos[0]+2*player.id;
-        if( pos[0] == (int)(4-player.id*2.5f) // if the pawn is at home
-            && !B[y][x] )                // if nothing is 2 squares ahead
+        y += player;
+        // if pawn is at home & nothing is 2 squares ahead
+        if(!(B.t[y][x] || B.b[y][x]))
         {
-            // it can move forward 2
-            tmp[count][0] = y;
-            tmp[count][1] = x;
-            tmp[count][2] = 0; // is never a capture
-            count++;
+            tmp[0][count[0]][0] = y;
+            tmp[0][count[0]][1] = x;
+            count[0]++;
         }
     }
-    int dx;
+    y = pos[0] + player;
+    // now captures
     for(int i=0; i<2; i++)
     {
-        dx = 1-2*i;
+        x = pos[1] + 1-2*i;
         // check if it's possible to capture in this direction
-        if(signum(B[pos[0]+player.id][pos[1]+dx]) == -player.id)
+        if(signum(B.b[y][x]) == -player)
         {
-            tmp[count][0] = pos[0]+player.id;
-            tmp[count][1] = pos[1]+dx;
-            tmp[count][2] = 1; // is always a capture
-            count++;
+            tmp[1][count[1]][0] = y;
+            tmp[1][count[1]][1] = x;
+            count[1]++;
         }
     }
     return malloc_from_tmp(tmp, count);
 }
 
-int** N__(int** B, int* pos, Player player)
+int*** N__(Board B, int* pos, int player)
 {
-    int tmp[100][3] =   // initialize to all possible {dx, dy} pairs
-    {                   // will later hold final coordinates
-        {-2,-1, 0}, {-2, 1, 0}, { 2,-1, 0}, { 2, 1, 0},
-        {-1,-2, 0}, {-1, 2, 0}, { 1,-2, 0}, { 1, 2, 0}
+    int tmp[2][64][2];
+    int count[2] = {0};
+    // candidate moves
+    int dydx[8][2] =
+    {
+        { 2,-1},{ 2, 1},{-2,-1},{-2, 1},
+        { 1,-2},{ 1, 2},{-1,-2},{-1, 2}
     };
 
-    int x,y, count = 0;
+    int x, y, cap;
     for(int i=0; i<8; i++)
     {
-        y=pos[0]+tmp[i][0], x=pos[1]+tmp[i][1];
+        y=pos[0]+dydx[i][0], x=pos[1]+dydx[i][1];
 
         if( y>=0 && y<8 && // within bounds
             x>=0 && x<8 && // ^^^
-            signum(B[y][x]) != player.id // not occupied by friendly piece
+            signum(B.b[y][x]) != player // not occupied by friendly piece
         ){
-            tmp[count][0] = y, tmp[count][1] = x;
-            tmp[count][2] = !!B[y][x];
-            count++;
+            // cap = 1 if capture, 0 if not
+            cap = B.b[y][x];
+            cap = (abs(cap)!=EP_FLAG) && (cap);
+            // copy over
+            tmp[cap][count[cap]][0] = y;
+            tmp[cap][count[cap]][1] = x;
+            count[cap]++;
         }
     }
     return malloc_from_tmp(tmp, count);
 }
 
-int** B__(int** B, int* pos, Player player)
+int*** B__(Board B, int* pos, int player)
 {
     // a bishop on an open board can reach 13 squares from the center
-    int tmp[100][3];
-    int dy, dx, count = 0;
+    int tmp[2][64][2];
+    int count[2] = {0};
 
+    int dy, dx;
     for(int a=0; a<2; a++)
     for(int b=0; b<2; b++)
     {
         dy = 1-2*a;
         dx = 1-2*b;
         //printf("dy=%d dx=%d\n",dy,dx);
-        trace_dydx(B, tmp, pos, dy, dx, player, &count);
+        trace_dydx(B, tmp, pos, dy, dx, player, count);
     }
     return malloc_from_tmp(tmp, count);
 }
 
-int** R__(int** B, int* pos, Player player)
+int*** R__(Board B, int* pos, int player)
 {
     // a rook on an open board can always reach 14 squares
-    int tmp[100][3];
-    int dy, dx, count = 0;
+    int tmp[2][64][2];
+    int count[2] = {0};
 
+    int dy, dx;
     for(int a=0; a<2; a++)
     for(int b=0; b<2; b++)
     {
         dy =  a*(1-2*b);
         dx = !a*(1-2*b);
-        trace_dydx(B, tmp, pos, dy, dx, player, &count);
+        trace_dydx(B, tmp, pos, dy, dx, player, count);
     }
     return malloc_from_tmp(tmp, count);
 }
 
-int** Q__(int** B, int* pos, Player player)
+int*** Q__(Board B, int* pos, int player)
 {
     // a queen on an open board can reach 27 squares from the center
-    int tmp[100][3];
-    int dy, dx, count = 0;
+    int tmp[2][64][2];
+    int count[2] = {0};
 
+    int dy, dx;
     for(int dy=-1; dy<2; dy++)
     for(int dx=-1; dx<2; dx++)
     {
         if(!dy && !dx) continue;
 
-        trace_dydx(B, tmp, pos, dy, dx, player, &count);
+        trace_dydx(B, tmp, pos, dy, dx, player, count);
     }
     return malloc_from_tmp(tmp, count);
 }
 
-int** K__(int** B, int* pos, Player player)
+int*** K__(Board B, int* pos, int player)
 {
-    // a king on an open board can reach 8 squares anywhere but the edge
-    int tmp[100][3];
-    int y, x;
-    int piece;
-    int count = 0;
+    int tmp[2][64][2];
+    int count[2] = {0};
 
-    //printf("K__((%d,%d),player %d)\n",pos[0],pos[1],player.id);
+    int y, x, cap;
     for(int dy=-1; dy<=1; dy++)
     for(int dx=-1; dx<=1; dx++)
     {
@@ -546,18 +573,19 @@ int** K__(int** B, int* pos, Player player)
         {
             y = pos[0] + dy;
             x = pos[1] + dx;
-            if(y>=0 && y<8 && x>=0 && x<8)
-            {
-                piece = B[y][x];
-                if(abs(piece)==EP_FLAG || signum(piece)!=player.id)
-                {
-                    tmp[count][0] = y;
-                    tmp[count][1] = x;
-                    tmp[count][2] = signum(piece) == -player.id \
-                                    && abs(piece) != EP_FLAG;
 
-                    count++;
-                }
+            if( y>=0 && y<8 && // within bounds
+                x>=0 && x<8 && // ^^^
+                signum(B.b[y][x]) != player // not occupied by friendly piece
+            ){
+                // cap = 1 if capture, 0 if not
+                cap = B.b[y][x];
+                cap = (abs(cap)!=EP_FLAG) && (cap);
+                // copy over
+                tmp[cap][count[cap]][0] = y;
+                tmp[cap][count[cap]][1] = x;
+
+                count[cap]++;
             }
         }
     }
@@ -566,46 +594,56 @@ int** K__(int** B, int* pos, Player player)
 
 // UTILITY FUNCTIONS
 
-void trace_dydx(int** B, int tmp[][3],
+void trace_dydx(Board B, int tmp[][64][2],
                 int* pos, int dy, int dx,
-                Player player, int* count )
+                int player, int count[2])
 {
-    //printf("trace_dydx: dy=%d, dx=%d\n", dy, dx);
     // go as far as possible in direction pointed to by {dy,dx}
-    int y, x;
+    int y, x, cap;
     for(int i=1; 1; i++)
     {
         y = pos[0] + dy*i, x = pos[1] + dx*i;
 
         if(y<0 || y>=8 || x<0 || x>=8) return;
 
-        if(abs(B[y][x]) != EP_FLAG && signum(B[y][x]) != player.id)
-        {
-            tmp[*count][0] = y;
-            tmp[*count][1] = x;
-            tmp[*count][2] = B[y][x] && abs(B[y][x])!=EP_FLAG; //capture?
+        cap = (B.b[y][x]) && (abs(B.b[y][x])!=EP_FLAG);
 
-            (*count)++;
+        if(signum(B.b[y][x]) != player)
+        {
+            tmp[cap][count[cap]][0] = y;
+            tmp[cap][count[cap]][1] = x;
+
+            count[cap]++;
         }
-        if(B[y][x] && abs(B[y][x]) != EP_FLAG) return;
+        if(cap) return;
     }
 }
 
-int** malloc_from_tmp(int tmp[][3], int count)
+int*** malloc_from_tmp(int tmp[][64][2], int count[2])
 {
-    if(!count) return NULL;
+    // create return pointer
+    int*** moves = malloc(2*sizeof(int**));
 
-    int** moves = malloc((count+1)*sizeof(int*)); // create return pointer
-    // |count|{m_1},...,{m_count}|
-    *moves = malloc(sizeof(int));
-    **moves = count; // first element = number of elements
-
-    for(int i=0; i<count; i++)
+    for(int i=0; i<2; i++)
     {
-        moves[i+1] = malloc(3*sizeof(int)); // create space
-        for(int j=0; j<3; j++)
+        // if there are no moves in this list, make it NULL
+        if(!count[i])
         {
-            moves[i+1][j] = tmp[i][j]; // populate from tmp
+            moves[i] = NULL;
+            continue;
+        }
+        // otherwise, create array
+        moves[i] = malloc((count[i]+1) * sizeof(int*));
+        // first element = number of elements
+        moves[i][0] = malloc(sizeof(int));
+        *moves[i][0] = count[i];
+        // the rest of the elements are the moves.
+        for(int j=0; j<count[i]; j++)
+        {
+            // make space
+            moves[i][j+1] = malloc(2*sizeof(int));
+            // copy values
+            for(int k=0;k<2; k++) moves[i][j+1][k] = tmp[i][j][k];
         }
     }
     return moves;
@@ -634,29 +672,35 @@ int** read_move(char* str)
     return r;
 }
 
-int** cpy_board(int** B)
+Board cpy_board(Board B)
 {
-    // create return pointer
-    int** C = malloc(sizeof(int*)*8);
+    Board C;
+
+    C.b = malloc(8*sizeof(int*));
+    C.t = malloc(8*sizeof(int*));
 
     for(int i=0; i<8; i++)
     {
-        // create space
-        C[i] = malloc(sizeof(int)*8);
-        // copy all values
-        for(int j=0; j<8; j++) C[i][j] = B[i][j];
+        C.b[i] = malloc(8*sizeof(int));
+        C.t[i] = malloc(8*sizeof(int));
+
+        for(int j=0; j<8; j++)
+        {
+            C.b[i][j] = B.b[i][j];
+            C.t[i][j] = B.t[i][j];
+        }
     }
     return C;
 }
 
-int* find(int** B, int piece, Player player)
+int* find(Board B, int piece, int player)
 {
     int* pos = malloc(sizeof(int)*2);
 
     for(int i=0; i<8; i++)
     for(int j=0; j<8; j++)
     {
-        if(B[i][j] == piece*player.id)
+        if(B.b[i][j] == piece*player)
         {
             pos[0] = i, pos[1] = j;
             return pos;
@@ -665,16 +709,16 @@ int* find(int** B, int piece, Player player)
     return NULL;
 }
 
-void print_board(int** B, Player player)
+void print_board(Board B, int player)
 {
-    char out[5];
-    int v, p = -player.id;
+
+    int v, p = -player;
     for(int i=7*(p<0); i<8 && i>=0; i+=p)
     {
         printf("\n\t%d |  ", i+1); // label 123
         for(int j=7*(p<0); j<8 && j>=0; j+=p)
         {
-            int v = B[i][j];
+            int v = B.b[i][j];
             printf( "%2c ",
                     abs(v)==EP_FLAG || !v
                         ? i%2 == j%2 ? ':' : '~'    // empty squares
@@ -691,12 +735,15 @@ void print_board(int** B, Player player)
     printf("\n\n");
 }
 
-void free_board(int** B)
+void free_board(Board B)
 {
     for(int i=0; i<8; i++)
-        free(B[i]);
-
-    free(B);
+    {
+        free(B.b[i]);
+        free(B.t[i]);
+    }
+    free(B.b);
+    free(B.t);
 }
 
 int signum(int x)
