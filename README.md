@@ -1,9 +1,11 @@
 # Simple Chess
-Simple, portable implementation of Chess written in C & displayed using
+Simple, portable, & flexible implementation of Chess written in C & displayed using
 simple ASCII characters.
 
 I made this over the span of two days with pretty much no outside influence.
-This is meant to be a base from which I can build chess variants.
+This is meant to be a base from which I can build chess variants. Thus, instead of
+implementing aggressive optimizations, I instead have aimed to make it
+very easy to implement new rules, new pieces, etc.
 
 Good:
 - Uses a cool way of checking for checks.
