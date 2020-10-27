@@ -85,7 +85,7 @@ int main(void)
     printf
     (   "\n%s%s%s%s%s\n",
 
-        "Chess by Antonio Leonti (Oct 25, 2020)\n\n",
+        "ASCII-Chess by Antonio Leonti (Oct 25, 2020)\n\n",
 
         "Notes:\n",
         " - Enter your moves as \"e2e4\", \"e7e5\", etc.\n",
@@ -131,7 +131,7 @@ int play_game(Board B)
         else
         {
             // otherwise, the game goes on.
-            printf("\n%s's turn:\n\t> ", (i>0) ? "White" : "Black");
+            printf("\n%s's turn: > ", (i>0) ? "White" : "Black");
 
             // get move ("g1f3 instead of Nf3" - PGN is HARD to program)
             fgets(input, 100, stdin);
@@ -228,6 +228,8 @@ int is_legal(Board B, int** move, int player)
     int ischeck;
     int islegal;
 
+    if(signum(p[0]) != player) return 0;
+
     // check for special cases
     switch(abs(p[0]))
     {
@@ -309,7 +311,7 @@ int is_legal(Board B, int** move, int player)
     // free stuff
     free(pos); free_board(H);
 
-    return !is_check(B, player);
+    return !ischeck;
 }
 
 //-checks if opponent is attacking specific square-----------------------------
@@ -371,6 +373,7 @@ int can_move(Board B, int player)
     // for determining if the move leaves you in check
     int* pos;
     Board H;
+    int ischeck;
 
     // iterate through entire board
     for(*i=0; *i<8; (*i)++)
