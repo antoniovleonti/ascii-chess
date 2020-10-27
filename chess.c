@@ -107,7 +107,7 @@ int main(void)
 
 // core functions
 
-// play a game and return the winner, or 0 if a draw.
+//-play a game and return the winner, or 0 if a draw.--------------------------
 int play_game(Board B)
 {
     char input[100]; // input buffer
@@ -165,7 +165,7 @@ int play_game(Board B)
     }
 }
 
-// plays a move on the board & handles special moves
+//-plays a move on the board & handles special moves---------------------------
 Board make_move(Board B, int** move, int player)
 {
     // helpful shortcuts
@@ -210,19 +210,21 @@ Board make_move(Board B, int** move, int player)
     return B;
 }
 
-// checks validity of a move (Da Rules)
+//-checks validity of a move (Da Rules)----------------------------------------
 int is_legal(Board B, int** move, int player)
 {
+    // indices & stuff
     int y[2] = {move[0][0], move[1][0]};
     int x[2] = {move[0][1], move[1][1]};
     int dy = y[1]-y[0];
     int dx = x[1]-x[0];
-
+    // pieces
     int p[2] = {B.b[y[0]][x[0]], B.b[y[1]][x[1]]};
-
+    // filled from other functions
     int*** list;
     int* pos;
-
+    Board H;
+    // logical
     int ischeck;
     int islegal;
 
@@ -281,18 +283,12 @@ int is_legal(Board B, int** move, int player)
     {
         //grab this pointer
         pos = list[!!p[1]][i];
-
-        // printf("%d: (%d/%d) %d %d\n", p[0], i, **list[!!p[1]], pos[0], pos[1]);
-
+        // if we've found the desired move
         if( pos[0] == move[1][0]
         &&  pos[1] == move[1][1] )
         {
             // free everything
-            // puts("HERE!1");
-            for(;i<=**list[!!p[1]]; i++)
-            {
-                free(list[!!p[1]][i]);
-            }
+            for(;i<=**list[!!p[1]]; i++) free(list[!!p[1]][i]);
 
             islegal = 1;
             break;
@@ -304,20 +300,19 @@ int is_legal(Board B, int** move, int player)
 
     if(!islegal) return 0;
 
-    // now see if it's check. Make the move on another board.
-    Board H = make_move(cpy_board(B), move, player);
+    // now we just need to make sure the move doesn't hang the king
+    H = make_move(cpy_board(B), move, player);
     // find the king
     pos = find(H, KING, player);
     // see if he's in check
     ischeck = is_hit(H, pos, player);
     // free stuff
-    free(pos);
-    free_board(H);
+    free(pos); free_board(H);
 
-    return !ischeck;
+    return !is_check(B, player);
 }
 
-//-checks for check (or potential check) of player-----------------------------
+//-checks if opponent is attacking specific square-----------------------------
 int is_hit(Board B, int* pos, int player)
 {
     // for list_moves[]();
@@ -369,10 +364,13 @@ int can_move(Board B, int player)
     // for feeding moves into is_legal
     int** move = malloc(2*sizeof(int*));
     move[0]    = malloc(2*sizeof(int));
-
+    // for iterating through moves
     int piece;
     int* i = &move[0][0];
     int* j = &move[0][1];
+    // for determining if the move leaves you in check
+    int* pos;
+    Board H;
 
     // iterate through entire board
     for(*i=0; *i<8; (*i)++)
@@ -394,8 +392,20 @@ int can_move(Board B, int player)
                 {
                     // copy move destination
                     move[1] = list[k][l];
-                    // if you find a legal move,
-                    if(is_legal(B, move, player))
+                    /*
+                     * We know the move is pseudo-legal because it was
+                     * generated using the move-generation functions. Just
+                     * make sure it's not check.
+                     */
+                    H = make_move(cpy_board(B), move, player);
+                    // find the king
+                    pos = find(H, KING, player);
+                    // see if he's in check
+                    ischeck = is_hit(H, pos, player);
+                    // free stuff
+                    free(pos); free_board(H);
+
+                    if(!ischeck)
                     {
                         // free everything
                         for(;k<2; k++)
@@ -432,9 +442,12 @@ This list is EQUIVALENT to the list of all squares from which the same piece
 This equivalence is very useful as it allows calculating potential checks,
 legal moves, etc for each piece using just one function.
 
-return looks like {n, {y_1, x_1, isCapture_1},...,{y_n, x_n, isCapture_n}}
+Return is two lists of positions: one lists the squares on which the piece may
+capture on, while one lists the squares the piece may move to without
+capturing. If a particular list is empty, its pointer is set to NULL. For
+example, if a pawn has no possible captures, (!list[1]) is true.
 */
-int*** P__(Board B, int* pos, int player)
+int*** P__(Board B, int* pos, int player) // PAWN
 {
     int tmp[2][64][2] = {0};
     int count[2] = {0};
@@ -476,7 +489,7 @@ int*** P__(Board B, int* pos, int player)
     return malloc_from_tmp(tmp, count);
 }
 
-int*** N__(Board B, int* pos, int player)
+int*** N__(Board B, int* pos, int player) // KNIGHT
 {
     int tmp[2][64][2];
     int count[2] = {0};
@@ -508,7 +521,7 @@ int*** N__(Board B, int* pos, int player)
     return malloc_from_tmp(tmp, count);
 }
 
-int*** B__(Board B, int* pos, int player)
+int*** B__(Board B, int* pos, int player) // BISHOP
 {
     // a bishop on an open board can reach 13 squares from the center
     int tmp[2][64][2];
@@ -526,7 +539,7 @@ int*** B__(Board B, int* pos, int player)
     return malloc_from_tmp(tmp, count);
 }
 
-int*** R__(Board B, int* pos, int player)
+int*** R__(Board B, int* pos, int player) // ROOK
 {
     // a rook on an open board can always reach 14 squares
     int tmp[2][64][2];
@@ -543,7 +556,7 @@ int*** R__(Board B, int* pos, int player)
     return malloc_from_tmp(tmp, count);
 }
 
-int*** Q__(Board B, int* pos, int player)
+int*** Q__(Board B, int* pos, int player) // QUEEN
 {
     // a queen on an open board can reach 27 squares from the center
     int tmp[2][64][2];
@@ -560,7 +573,7 @@ int*** Q__(Board B, int* pos, int player)
     return malloc_from_tmp(tmp, count);
 }
 
-int*** K__(Board B, int* pos, int player)
+int*** K__(Board B, int* pos, int player) // KING
 {
     int tmp[2][64][2];
     int count[2] = {0};
