@@ -1,7 +1,13 @@
+/*  Antonio Leonti
+    10.26.2020
+*/
+
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
 #include <math.h>
+
 
 /*-MACRO DEFINITIONS----------------------------------------------------------*/
 
@@ -11,8 +17,9 @@
 #define BISHOP  3
 #define ROOK    4
 #define QUEEN   5
-#define KING    6
+#define KING    6   // make sure king is ALWAYS 6
 #define EP_FLAG 99  // en passant flag
+
 
 /*-TYPE DEFINITIONS-----------------------------------------------------------*/
 
@@ -25,27 +32,33 @@ typedef struct Board_
 // type for piece movement functions
 typedef int*** (*Piece_f)(Board, int*, int);
 
+
 /*-FUNCTION DECLARATIONS------------------------------------------------------*/
 
 // game / board state
 Board make_move(Board, int**, int);
 int play_game(Board);
+
 // move evaluation
 int is_pseudo_legal(Board, int**, int);
 int is_suicide(Board, int**, int);
 int is_trapped(Board, int);
-int is_hit(Board, int*, int);
+int is_hit_by(Board, int*, int, int);
+
 // handling boards
 Board copy_board(Board);
 void free_board(Board);
+
 // IO
 void print_board(Board, int);
 int** read_move(char*);
+
 // helper functions
 void cast_dydx(Board, int[][64][2], int*, int, int, int, int[2]);
 int*** malloc_from_tmp(int[][64][2], int[2]);
 int* find(Board, int, int);
 int signum(int);
+
 // piece movement functions
 int*** P__(Board, int*, int ); // PAWN
 int*** N__(Board, int*, int ); // KNIGHT
@@ -53,12 +66,15 @@ int*** B__(Board, int*, int ); // BISHOP
 int*** R__(Board, int*, int ); // ROOK
 int*** Q__(Board, int*, int ); // QUEEN
 int*** K__(Board, int*, int ); // KING
+
 // array of piece movement functions
 Piece_f list_moves[N_PCS] = {P__,N__,B__,R__,Q__,K__};
+
 
 /*-FUNCTION DEFINITIONS-------------------------------------------------------*/
 
 /*-helper functions-----------------------------------------------------------*/
+
 int signum(int x)
 {
     return (x>0) - (x<0);
@@ -121,7 +137,8 @@ int*** malloc_from_tmp(int tmp[][64][2], int count[2])
 }
 
 /*-Piece movement functions---------------------------------------------------*/
-int*** P__(Board B, int* pos, int player) // PAWN
+
+int*** P__(Board B, int* pos, int player) // PAWN.......list_moves[0]
 {
     int tmp[2][64][2] = {0};
     int count[2] = {0};
@@ -168,7 +185,7 @@ int*** P__(Board B, int* pos, int player) // PAWN
     return malloc_from_tmp(tmp, count);
 }
 
-int*** N__(Board B, int* pos, int player) // KNIGHT
+int*** N__(Board B, int* pos, int player) // KNIGHT.....list_moves[1]
 {
     int tmp[2][64][2];
     int count[2] = {0};
@@ -200,7 +217,7 @@ int*** N__(Board B, int* pos, int player) // KNIGHT
     return malloc_from_tmp(tmp, count);
 }
 
-int*** B__(Board B, int* pos, int player) // BISHOP
+int*** B__(Board B, int* pos, int player) // BISHOP.....list_moves[2]
 {
     // a bishop on an open board can reach 13 squares from the center
     int tmp[2][64][2];
@@ -218,7 +235,7 @@ int*** B__(Board B, int* pos, int player) // BISHOP
     return malloc_from_tmp(tmp, count);
 }
 
-int*** R__(Board B, int* pos, int player) // ROOK
+int*** R__(Board B, int* pos, int player) // ROOK.......list_moves[3]
 {
     // a rook on an open board can always reach 14 squares
     int tmp[2][64][2];
@@ -235,7 +252,7 @@ int*** R__(Board B, int* pos, int player) // ROOK
     return malloc_from_tmp(tmp, count);
 }
 
-int*** Q__(Board B, int* pos, int player) // QUEEN
+int*** Q__(Board B, int* pos, int player) // QUEEN......list_moves[4]
 {
     // a queen on an open board can reach 27 squares from the center
     int tmp[2][64][2];
@@ -252,7 +269,7 @@ int*** Q__(Board B, int* pos, int player) // QUEEN
     return malloc_from_tmp(tmp, count);
 }
 
-int*** K__(Board B, int* pos, int player) // KING
+int*** K__(Board B, int* pos, int player) // KING.......list_moves[5]
 {
     int tmp[2][64][2];
     int count[2] = {0};
@@ -286,7 +303,7 @@ int*** K__(Board B, int* pos, int player) // KING
     if( pos[0] == (int)(4-3.5f*player)  // correct y coord
      && pos[1] == 3                     // correct x coord
      && !B.t[pos[0]][3]                 // untouched king
-     //&& !is_hit(B, pos, player)         // not in check
+     && !is_hit_by(B, pos, -33, player) // not in check
     ){
         for(int i=0; i<2; i++)
         {
@@ -318,7 +335,9 @@ int*** K__(Board B, int* pos, int player) // KING
 }
 
 /*-Game / board state handling functions--------------------------------------*/
-int play_game(Board B)
+
+// plays a chess game from starting position B
+int play_chess(Board B)
 {
     char input[100]; // input buffer
     int** m; // player's move
@@ -335,7 +354,7 @@ int play_game(Board B)
             // find the king
             int* pos = find(B, KING, i);
             // is he in check?
-            int isCheck = is_hit(B, pos, i);
+            int isCheck = is_hit_by(B, pos, -1, i);
             free(pos); // (done with this)
 
             return isCheck * -i; // return {-1, 0, 1}
@@ -370,6 +389,7 @@ int play_game(Board B)
     }
 }
 
+// checks if player has any legal moves
 int is_trapped(Board B, int player)
 {
     int answer = 1;
@@ -415,22 +435,7 @@ int is_trapped(Board B, int player)
     return 1;
 }
 
-int* find(Board B, int piece, int player)
-{
-    int* pos = malloc(sizeof(int)*2);
-
-    for(int i=0; i<8; i++)
-    for(int j=0; j<8; j++)
-    {
-        if(B.b[i][j] == piece*player)
-        {
-            pos[0] = i, pos[1] = j;
-            return pos;
-        }
-    }
-    return NULL;
-}
-
+// makes move & handles special cases (such as moving the rook when castling)
 Board make_move(Board B, int** move, int player)
 {
     // helpful shortcuts
@@ -458,11 +463,15 @@ Board make_move(Board B, int** move, int player)
         {
             // enable en passant
             if(!dx && dy==2*player)
+            {
                 B.b[y[0]+player][x[0]] = player*EP_FLAG;
+            }
 
             // enable pawn promotions
             else if(y[1]==(int)(4+(3.5*player)))
+            {
                 B.b[y[0]][x[0]] = QUEEN*player;
+            }
         } break;
     }
 
@@ -484,7 +493,26 @@ Board make_move(Board B, int** move, int player)
     return B;
 }
 
+// finds player's piece on the board (usually the king, but can be any piece)
+int* find(Board B, int piece, int player)
+{
+    int* pos = malloc(sizeof(int)*2);
+
+    for(int i=0; i<8; i++)
+    for(int j=0; j<8; j++)
+    {
+        if(B.b[i][j] == piece*player)
+        {
+            pos[0] = i, pos[1] = j;
+            return pos;
+        }
+    }
+    return NULL;
+}
+
 /*-Move evaluation functions--------------------------------------------------*/
+
+// checks if destination square is available for piece at source square
 int is_pseudo_legal(Board B, int** move, int player)
 {
     int answer = 0;
@@ -531,31 +559,33 @@ int is_pseudo_legal(Board B, int** move, int player)
     return answer;
 }
 
-int is_hit(Board B, int* pos, int player)
+// checks if square is hit by opposing player's pieces "set" (1) in bitmask
+int is_hit_by(Board B, int* pos, int mask, int player)
 {
     int answer = 0;
-    // for list_moves[]();
-    int y, x;
 
-    for(int i=0; i<N_PCS && !answer; i++)
+    for(int i=0; !answer && i<N_PCS; i++)
     {
+        if(!(mask>>i & 1)) continue; // check if piece is included
+
         // get all moves possible of piece i from pos
         int*** list = list_moves[i](B, pos, player);
 
         // ignore the non-captures
         if(list[0])
         {
-            for(int j=**list[0]; j>=0; j--) free(list[0][j]); // free elements
-            free(list[0]); // free pointer
+            for(int j=**list[0]; j>=0; j--) free(list[0][j]);
+            free(list[0]);
         }
-
-        if(!list[1]){ free(list); continue; } // if there's no captures
+        if(!list[1]){ free(list); continue; } // if there are no captures
 
         // check all potential captures here
         for(int j=1; j<=**list[1]; j++)
         {
-            y = list[1][j][0];
-            x = list[1][j][1];
+            int y = list[1][j][0];
+            int x = list[1][j][1];
+
+            printf("checking (%d,%d) for piece %d\n",y,x,i*player);
 
             // if this is the right piece to attack pos
             if(!answer && abs(B.b[y][x])==(i+1)) answer=1;
@@ -570,6 +600,7 @@ int is_hit(Board B, int* pos, int player)
     return answer;
 }
 
+// checks if move results in the loss of the king
 int is_suicide(Board B, int** move, int player)
 {
     int answer = 0;
@@ -584,13 +615,13 @@ int is_suicide(Board B, int** move, int player)
 
     do
     {
+        // inch king closer destination square (if king doesn't, do nothing)
         for(int i=0; i<2; i++)
         {
-            // if they are the same nothing happens
             pos[0][i] += signum(pos[1][i]-pos[0][i]);
         }
-
-        if(is_hit(H, pos[0], player))
+        // check if king is hit at any point during his journey
+        if(is_hit_by(H, pos[0], -1, player))
         {
             answer = 1;
             break;
@@ -609,6 +640,7 @@ int is_suicide(Board B, int** move, int player)
 }
 
 /*-Board handling functions---------------------------------------------------*/
+
 Board copy_board(Board B)
 {
     Board C;
@@ -618,14 +650,12 @@ Board copy_board(Board B)
 
     for(int i=0; i<8; i++)
     {
+        // make space for data
         C.b[i] = malloc(8*sizeof(int));
         C.t[i] = malloc(8*sizeof(int));
-
-        for(int j=0; j<8; j++)
-        {
-            C.b[i][j] = B.b[i][j];
-            C.t[i][j] = B.t[i][j];
-        }
+        // copy data
+        memcpy(C.b[i], B.b[i], 8*sizeof(int));
+        memcpy(C.t[i], B.t[i], 8*sizeof(int));
     }
     return C;
 }
@@ -642,6 +672,7 @@ void free_board(Board B)
 }
 
 /*-IO functions---------------------------------------------------------------*/
+
 int** read_move(char* str)
 {
     //if(strlen(str)!=4) return NULL;

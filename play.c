@@ -20,16 +20,27 @@ int main(void)
     //     {-1,-1,-1,-1,-1,-1,-1,-1},
     //     {-4,-2,-3,-6,-5,-3,-2,-4}
     // };
+    {
+        { 4, 0, 0, 6, 0, 0, 0, 4},
+        { 0, 0, 0, 1, 0, 0, 0, 0},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        { 0, 0, 0, 0, 0, 0, 0, 0},
+        { 0, 0, 0,-5, 0, 0, 0, 0},
+        { 0, 0, 0,-6, 0,-4, 0,-4}
+    };
 
     B.b = malloc(8*sizeof(int*));
     B.t = malloc(8*sizeof(int*));
 
     for(int i=0; i<8; i++)
     {
+        // copy starting position
         B.b[i] = malloc(8*sizeof(int));
+        memcpy(B.b[i], start[i], 8*sizeof(int));
+        // set up touch board
         B.t[i] = calloc(8,sizeof(int));
-
-        for(int j=0; j<8; j++) B.b[i][j] = start[i][j];
     }
 
     printf
@@ -45,12 +56,12 @@ int main(void)
     );
 
     // play the game
-    r = play_game(B);
+    r = play_chess(B);
 
     // print results
-    putchar('t'); for(int i=0; i<=35; i++) putchar('*');
-    if(r) printf("\n\tCHECKMATE! %s wins!\n\n", r>0?"White":"Black");
-    else printf("\n\tSTALEMATE! It's a draw!\n\n");
+    for(int i=0; i<=35; i++) putchar('*');
+    if(r) printf("\n\n\tCHECKMATE! %s wins!\n\n", r>0?"White":"Black");
+    else printf("\n\n\tSTALEMATE! It's a draw!\n\n");
 
     return 0;
 }
