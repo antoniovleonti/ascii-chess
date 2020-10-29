@@ -1,5 +1,6 @@
 /*  Antonio Leonti
     10.26.2020
+    chess.h - a chess header
 */
 
 
@@ -29,7 +30,8 @@ typedef struct Board_
     int** b; // 8x8 piece map {-N_PIECES..N_PIECES}
     int** t; // 8x8 touch map {0,1}
 } Board;
-// type for piece movement functions
+
+// type for each piece movement function
 typedef int*** (*Piece_f)(Board, int*, int);
 
 
@@ -41,9 +43,9 @@ int play_game(Board);
 
 // move evaluation
 int is_pseudo_legal(Board, int**, int);
+int is_hit_by(Board, int*, int, int);
 int is_suicide(Board, int**, int);
 int is_trapped(Board, int);
-int is_hit_by(Board, int*, int, int);
 
 // handling boards
 Board copy_board(Board);
@@ -60,12 +62,12 @@ int* find(Board, int, int);
 int signum(int);
 
 // piece movement functions
-int*** P__(Board, int*, int ); // PAWN
-int*** N__(Board, int*, int ); // KNIGHT
-int*** B__(Board, int*, int ); // BISHOP
-int*** R__(Board, int*, int ); // ROOK
-int*** Q__(Board, int*, int ); // QUEEN
-int*** K__(Board, int*, int ); // KING
+int*** P__(Board, int*, int); // PAWN
+int*** N__(Board, int*, int); // KNIGHT
+int*** B__(Board, int*, int); // BISHOP
+int*** R__(Board, int*, int); // ROOK
+int*** Q__(Board, int*, int); // QUEEN
+int*** K__(Board, int*, int); // KING
 
 // array of piece movement functions
 Piece_f list_moves[N_PCS] = {P__,N__,B__,R__,Q__,K__};
@@ -168,13 +170,14 @@ int*** P__(Board B, int* pos, int player) // PAWN.......list_moves[0]
             count[0]++;
         }
     }
-    y = pos[0] + player;
+
     // now captures
+    y = pos[0] + player;
     for(int i=0; i<2; i++)
     {
         x = pos[1] + 1-2*i;
         // check if it's possible to capture in this direction
-        if( x >= 0 && x < 8
+        if( x>=0 && x<8
          && signum(B.b[y][x]) == -player)
         {
             tmp[1][count[1]][0] = y;
@@ -278,24 +281,22 @@ int*** K__(Board B, int* pos, int player) // KING.......list_moves[5]
     for(int dy=-1; dy<=1; dy++)
     for(int dx=-1; dx<=1; dx++)
     {
-        if(dy || dx)
+        int y = pos[0] + dy;
+        int x = pos[1] + dx;
+
+        if( (dy || dx)
+         && y>=0 && y<8 // within bounds
+         && x>=0 && x<8
+         && signum(B.b[y][x]) != player) // not occupied by friendly piece
         {
-            int y = pos[0] + dy;
-            int x = pos[1] + dx;
+            // cap = 1 if capture, 0 if not
+            int cap = B.b[y][x];
+            cap = (abs(cap)!=EP_FLAG) && (cap);
+            // copy over
+            tmp[cap][count[cap]][0] = y;
+            tmp[cap][count[cap]][1] = x;
 
-            if( y>=0 && y<8 // within bounds
-            &&  x>=0 && x<8
-            &&  signum(B.b[y][x]) != player) // not occupied by friendly piece
-            {
-                // cap = 1 if capture, 0 if not
-                int cap = B.b[y][x];
-                cap = (abs(cap)!=EP_FLAG) && (cap);
-                // copy over
-                tmp[cap][count[cap]][0] = y;
-                tmp[cap][count[cap]][1] = x;
-
-                count[cap]++;
-            }
+            count[cap]++;
         }
     }
 
@@ -340,10 +341,8 @@ int*** K__(Board B, int* pos, int player) // KING.......list_moves[5]
 int play_chess(Board B)
 {
     char input[100]; // input buffer
-    int** m; // player's move
 
-
-    // begin game
+    // begin game with player 1 making a move
     for(int i=1; 1; i=-i)
     {
         print_board(B, i);
@@ -365,7 +364,7 @@ int play_chess(Board B)
 
         // get move ("g1f3 instead of Nf3" - PGN is HARD to program)
         fgets(input, 100, stdin);
-        m = read_move(input); // translate input; move is in m
+        int** m = read_move(input); // translate input; move is in m
 
         if(!m) // if input is invalid
         {
@@ -584,8 +583,6 @@ int is_hit_by(Board B, int* pos, int mask, int player)
         {
             int y = list[1][j][0];
             int x = list[1][j][1];
-
-            printf("checking (%d,%d) for piece %d\n",y,x,i*player);
 
             // if this is the right piece to attack pos
             if(!answer && abs(B.b[y][x])==(i+1)) answer=1;
