@@ -3,9 +3,9 @@ Simple, portable, & flexible implementation of Chess written in C & displayed us
 simple ASCII characters.
 
 I made this over the span of two days with pretty much no outside influence.
-This is meant to be a base from which I can build chess variants. Thus, instead of
-implementing aggressive optimizations, I instead have aimed to make it
-very easy to implement new rules, new pieces, etc.
+This is meant to be a base from which I can build chess variants (for people, not
+computers, to play). Thus, instead of implementing aggressive optimizations, I 
+instead aimed to make it very easy to implement new rules, new pieces, etc.
 
 Good:
 - Uses a cool way of checking for checks.
@@ -15,5 +15,5 @@ Good:
 
 Bad:
 - Underpromotion is not implemented.
-- Does not use bitboards.
+- Is likely relatively slow when compared to many other chess programs.
 - No AI or playing partner. :/
