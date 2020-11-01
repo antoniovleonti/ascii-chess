@@ -16,4 +16,5 @@ Good:
 Bad:
 - Underpromotion is not implemented.
 - Is likely relatively slow when compared to many other chess programs.
+(not that this is noticeable to the user)
 - No AI or playing partner. :/
