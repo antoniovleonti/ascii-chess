@@ -10,7 +10,7 @@
 #include <math.h>
 
 
-/*-MACRO DEFINITIONS----------------------------------------------------------*/
+/*----------------------------------------------------------MACRO DEFINITIONS-*/
 
 #define N_PCS   6   // number of pieces
 #define PAWN    1   // piece ids
@@ -22,7 +22,7 @@
 #define EP_FLAG 99  // en passant flag
 
 
-/*-TYPE DEFINITIONS-----------------------------------------------------------*/
+/*-----------------------------------------------------------TYPE DEFINITIONS-*/
 
 // playing board
 typedef struct Board_
@@ -35,7 +35,7 @@ typedef struct Board_
 typedef int*** (*Piece_f)(Board, int*, int);
 
 
-/*-FUNCTION DECLARATIONS------------------------------------------------------*/
+/*------------------------------------------------------FUNCTION DECLARATIONS-*/
 
 // game / board state
 Board make_move(Board, int**, int);
@@ -73,7 +73,7 @@ int*** K__(Board, int*, int); // KING
 Piece_f list_moves[N_PCS] = {P__,N__,B__,R__,Q__,K__};
 
 
-/*-FUNCTION DEFINITIONS-------------------------------------------------------*/
+/*-------------------------------------------------------FUNCTION DEFINITIONS-*/
 
 /*-helper functions-----------------------------------------------------------*/
 
@@ -82,7 +82,7 @@ int signum(int x)
     return (x>0) - (x<0);
 }
 
-void cast_dydx(Board B, int tmp[][64][2],
+void cast_dydx( Board B, int tmp[][64][2],
                 int* pos, int dy, int dx,
                 int player, int count[2])
 {
@@ -301,9 +301,7 @@ int*** K__(Board B, int* pos, int player) // KING.......list_moves[5]
     }
 
     // find castling moves
-    if( pos[0] == (int)(4-3.5f*player)  // correct y coord
-     && pos[1] == 3                     // correct x coord
-     && !B.t[pos[0]][3]                 // untouched king
+    if( !B.t[pos[0]][pos[1]]            // untouched king
      && !is_hit_by(B, pos, -33, player) // not in check
     ){
         for(int i=0; i<2; i++)
@@ -442,7 +440,7 @@ Board make_move(Board B, int** move, int player)
     int x[2] = {move[0][1],move[1][1]};
     int dy = y[1]-y[0], dx = x[1]-x[0];
 
-    int piece = B.b[y[1]][x[0]];
+    int piece = B.b[y[0]][x[0]];
 
     int* pos;
 
@@ -570,13 +568,13 @@ int is_hit_by(Board B, int* pos, int mask, int player)
         // get all moves possible of piece i from pos
         int*** list = list_moves[i](B, pos, player);
 
-        // ignore the non-captures
+        // ignore the non-captures (we're interested in threats of captures)
         if(list[0])
         {
             for(int j=**list[0]; j>=0; j--) free(list[0][j]);
             free(list[0]);
         }
-        if(!list[1]){ free(list); continue; } // if there are no captures
+        if(!list[1]){ free(list); continue; } // if there are no captures i++
 
         // check all potential captures here
         for(int j=1; j<=**list[1]; j++)
@@ -704,8 +702,8 @@ void print_board(Board B, int player)
             int v = B.b[i][j];
             printf( "%2c ",
                 abs(v)==EP_FLAG || !v
-                    ? i%2 == j%2 ? ':' : '~'    // empty squares
-                    : "kqrbnp_PNBRQK"[6+v]      // pieces
+                    ? i%2 == j%2 ? ':' : '~'    // print empty squares
+                    : "kqrbnp_PNBRQK"[6+v]      // print pieces
             );
         }
     }
